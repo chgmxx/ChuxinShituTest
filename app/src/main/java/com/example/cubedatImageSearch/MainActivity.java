@@ -10,26 +10,41 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.hardware.Camera;
+import android.hardware.Camera.Size;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Log;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.IOException;
+import java.util.List;
+
 //@TargetApi(Build.VERSION_CODES.GINGERBREAD)
-public class MainActivity extends Activity implements OnClickListener{
+public class MainActivity extends Activity implements OnClickListener,  SurfaceHolder.Callback{
 	private static final String TAG = null;
 	private static final String requestURL = "http://image.baidu.com/pictureup/uploadshitu?fr=flash&fm=index&pos=upload";
 	private Button selectImage, uploadImage;
 	private ImageView imageView;
 	private TextView textView;
 
+	Camera camera;
+	SurfaceView surfaceView;
+	SurfaceHolder surfaceHolder;
+	Button buttonStartCameraPreview, buttonStopCameraPreview;
+	boolean previewing = false;
+	LinearLayout get_more;
+	Camera.Size optimalSize;
 	private String picPath = null;
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -43,6 +58,82 @@ public class MainActivity extends Activity implements OnClickListener{
 		textView = (TextView) findViewById(R.id.textView);
 		imageView = (ImageView) this.findViewById(R.id.imageView);
 
+		buttonStartCameraPreview = (Button) findViewById(R.id.startcamerapreview);
+		buttonStopCameraPreview = (Button) findViewById(R.id.stopcamerapreview);
+		surfaceView = (SurfaceView) findViewById(R.id.surfaceview);
+		surfaceHolder = surfaceView.getHolder();
+		surfaceHolder.addCallback(this);
+		surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+		buttonStartCameraPreview.setOnClickListener(new OnClickListener()
+		{
+
+			@Override
+			public void onClick(View v)
+			{
+				// TODO Auto-generated method stub
+				if (!previewing)
+				{
+					camera = Camera.open();
+					if (camera != null)
+					{
+						try
+						{
+							camera.setDisplayOrientation(90);
+							Camera.Parameters parameters = camera.getParameters();
+							List<Camera.Size> sizes = parameters.getSupportedPreviewSizes();
+							Camera.Size optimalSize = getOptimalPreviewSize(sizes, getResources().getDisplayMetrics().widthPixels, getResources().getDisplayMetrics().heightPixels);
+							parameters.setPreviewSize(optimalSize.width, optimalSize.height);
+							camera.setParameters(parameters);
+							camera.setPreviewDisplay(surfaceHolder);
+							camera.startPreview();
+							previewing = true;
+						} catch (IOException e)
+						{
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+				}
+
+			}
+		});
+		buttonStopCameraPreview.setOnClickListener(new OnClickListener()
+		{
+
+			@Override
+			public void onClick(View v)
+			{
+				// TODO Auto-generated method stub
+				if (camera != null && previewing)
+				{
+					camera.stopPreview();
+					camera.release();
+					camera = null;
+					previewing = false;
+				}
+
+			}
+		});
+
+	}
+	@Override
+	public void surfaceChanged(SurfaceHolder holder, int format, int width, int height)
+	{
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void surfaceCreated(SurfaceHolder holder)
+	{
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void surfaceDestroyed(SurfaceHolder holder)
+	{
+		// TODO Auto-generated method stub
 
 	}
 	@Override
@@ -164,5 +255,52 @@ public class MainActivity extends Activity implements OnClickListener{
 					}
 				}).create();
 		dialog.show();
+	}
+	public static Camera.Size getOptimalPreviewSize(List<Camera.Size> cameraPreviewSizes, int targetWidth, int targetHeight, boolean isActivityPortrait) {
+		if (null == cameraPreviewSizes) {
+			return null;
+		}
+
+		int optimalHeight = Integer.MIN_VALUE;
+		int optimalWidth = Integer.MIN_VALUE;
+
+		for (Camera.Size cameraPreviewSize : cameraPreviewSizes) {
+			boolean isCameraPreviewHeightBigger = cameraPreviewSize.height > cameraPreviewSize.width;
+			int actualCameraWidth = cameraPreviewSize.width;
+			int actualCameraHeight = cameraPreviewSize.height;
+
+			if (isActivityPortrait) {
+				if (!isCameraPreviewHeightBigger) {
+					int temp = cameraPreviewSize.width;
+					actualCameraWidth = cameraPreviewSize.height;
+					actualCameraHeight = temp;
+				}
+			} else {
+				if (isCameraPreviewHeightBigger) {
+					int temp = cameraPreviewSize.width;
+					actualCameraWidth = cameraPreviewSize.height;
+					actualCameraHeight = temp;
+				}
+			}
+
+			if (actualCameraWidth > targetWidth || actualCameraHeight > targetHeight) {
+				// finds only smaller preview sizes than target size
+				continue;
+			}
+
+			if (actualCameraWidth > optimalWidth && actualCameraHeight > optimalHeight) {
+				// finds only better sizes
+				optimalWidth = actualCameraWidth;
+				optimalHeight = actualCameraHeight;
+			}
+		}
+
+		Size optimalSize = null;
+
+		if (optimalHeight != Integer.MIN_VALUE && optimalWidth != Integer.MIN_VALUE) {
+			optimalSize = new Size(optimalWidth, optimalHeight);
+		}
+
+		return optimalSize;
 	}
 }

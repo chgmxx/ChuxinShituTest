@@ -21,9 +21,25 @@
     android:text="@string/baidu_shitu"  
     android:id="@+id/uploadImage"  
     />  
-    <ImageView    
-    android:layout_width="fill_parent"   
-    android:layout_height="wrap_content"   
-    android:id="@+id/imageView"  
-        />  
+    <ImageView
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:id="@+id/imageView"
+    />
+    <Button
+        android:id="@+id/startcamerapreview"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="- Start Camera Preview -" />
+
+    <Button
+        android:id="@+id/stopcamerapreview"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="- Stop Camera Preview -" />
+
+    <SurfaceView
+        android:id="@+id/surfaceview"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content" />
 </LinearLayout>  
