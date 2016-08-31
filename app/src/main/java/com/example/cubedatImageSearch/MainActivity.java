@@ -15,7 +15,9 @@ import android.hardware.Camera.Size;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -27,7 +29,12 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 
 //@TargetApi(Build.VERSION_CODES.GINGERBREAD)
@@ -37,8 +44,12 @@ public class MainActivity extends Activity implements OnClickListener,  SurfaceH
 	private Button selectImage, uploadImage;
 	private ImageView imageView;
 	private TextView textView;
+	private  Button queryPreviewPicture;
 
-	Camera camera;
+	private String strCaptureFilePath = Environment
+			.getExternalStorageDirectory() + "/DCIM/Camera/";// 保存图像的路径
+	private String strCaptureFileFullName ;
+	Camera mCamera;
 	SurfaceView surfaceView;
 	SurfaceHolder surfaceHolder;
 	Button buttonStartCameraPreview, buttonStopCameraPreview;
@@ -53,6 +64,8 @@ public class MainActivity extends Activity implements OnClickListener,  SurfaceH
 
 		selectImage = (Button) this.findViewById(R.id.selectImage);
 		uploadImage = (Button) this.findViewById(R.id.uploadImage);
+		queryPreviewPicture =   (Button) this.findViewById(R.id.query_preview_picture);
+		queryPreviewPicture.setOnClickListener(this);
 		selectImage.setOnClickListener(this);
 		uploadImage.setOnClickListener(this);
 		textView = (TextView) findViewById(R.id.textView);
@@ -73,19 +86,20 @@ public class MainActivity extends Activity implements OnClickListener,  SurfaceH
 				// TODO Auto-generated method stub
 				if (!previewing)
 				{
-					camera = Camera.open();
-					if (camera != null)
+					mCamera = Camera.open();
+					if (mCamera != null)
 					{
 						try
 						{
-							camera.setDisplayOrientation(90);
-							Camera.Parameters parameters = camera.getParameters();
+							mCamera.setDisplayOrientation(90);
+							Camera.Parameters parameters = mCamera.getParameters();
 							List<Camera.Size> sizes = parameters.getSupportedPreviewSizes();
-							Camera.Size optimalSize = getOptimalPreviewSize(sizes, getResources().getDisplayMetrics().widthPixels, getResources().getDisplayMetrics().heightPixels);
-							parameters.setPreviewSize(optimalSize.width, optimalSize.height);
-							camera.setParameters(parameters);
-							camera.setPreviewDisplay(surfaceHolder);
-							camera.startPreview();
+							Camera.Size optimalSize = getOptimalPreviewSize(sizes, getResources().getDisplayMetrics().widthPixels, getResources().getDisplayMetrics().heightPixels,false);
+							parameters.setPreviewSize(1280, 720);
+							Log.d(TAG,"preivew size width ="+sizes.get(0).width+",height="+sizes.get(0).height);
+							mCamera.setParameters(parameters);
+							mCamera.setPreviewDisplay(surfaceHolder);
+							mCamera.startPreview();
 							previewing = true;
 						} catch (IOException e)
 						{
@@ -103,12 +117,14 @@ public class MainActivity extends Activity implements OnClickListener,  SurfaceH
 			@Override
 			public void onClick(View v)
 			{
+
 				// TODO Auto-generated method stub
-				if (camera != null && previewing)
+				if (mCamera != null && previewing)
 				{
-					camera.stopPreview();
-					camera.release();
-					camera = null;
+					//takePicture();
+					mCamera.stopPreview();
+					mCamera.release();
+					mCamera = null;
 					previewing = false;
 				}
 
@@ -151,12 +167,16 @@ public class MainActivity extends Activity implements OnClickListener,  SurfaceH
 				break;
 			case R.id.uploadImage:
 				if (picPath == null) {
-					Toast.makeText(MainActivity.this, "请选择图片！", 1000).show();
+					Toast.makeText(MainActivity.this, "请选择图片！", Toast.LENGTH_SHORT).show();
 				}
 				else{
 					new CaptureTask().execute(picPath, requestURL);
 				}
 				break;
+			case R.id.query_preview_picture:
+				takePicture();
+
+			break;
 			default:
 				break;
 		}
@@ -174,19 +194,13 @@ public class MainActivity extends Activity implements OnClickListener,  SurfaceH
 		{
 			publishProgress("正在连接...");
 			String postResponseUrl = ShituUtils.postFile(params[0], params[1]);
+			Log.d(TAG,"postResponseUrl:"+postResponseUrl);
 			publishProgress("连接成功");
 			publishProgress("正在识别...");
 			String shituResult = null;
 			shituResult = ShituUtils.resolvePostResponse(postResponseUrl);
-			Log.i("AsyncTask", picPath);
-			/*try
-			{
-				Thread.sleep(10);
-			} catch (InterruptedException e)
-			{
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}*/
+			Log.i("AsyncTask", params[0]);
+
 			return shituResult;
 		}
 
@@ -298,9 +312,88 @@ public class MainActivity extends Activity implements OnClickListener,  SurfaceH
 		Size optimalSize = null;
 
 		if (optimalHeight != Integer.MIN_VALUE && optimalWidth != Integer.MIN_VALUE) {
-			optimalSize = new Size(optimalWidth, optimalHeight);
+			//optimalSize = new Size(optimalWidth, optimalHeight);
 		}
 
 		return optimalSize;
+	}
+
+	/* 拍照的method */
+	private void takePicture() {
+		if (mCamera != null) {
+			mCamera.takePicture(null, null, jpegCallback);
+		}
+	}
+	//在takepicture中调用的回调方法之一，接收jpeg格式的图像
+	private Camera.PictureCallback jpegCallback = new Camera.PictureCallback() {
+		public void onPictureTaken(byte[] _data, Camera _camera) {
+
+            /*
+             * if (Environment.getExternalStorageState().equals(
+             * Environment.MEDIA_MOUNTED)) // 判断SD卡是否存在，并且可以可以读写 {
+             *
+             * } else { Toast.makeText(EX07_16.this, "SD卡不存在或写保护",
+             * Toast.LENGTH_LONG) .show(); }
+             */
+			// Log.w("============", _data[55] + "");
+
+			try {
+                /* 取得相片 */
+				Bitmap bm = BitmapFactory.decodeByteArray(_data, 0,
+						_data.length);
+
+                /* 创建文件 */
+
+
+				File myCaptureFile = new File(strCaptureFilePath, getCurrentTimeString()+".jpg");
+				BufferedOutputStream bos = new BufferedOutputStream(
+						new FileOutputStream(myCaptureFile));
+				strCaptureFileFullName = myCaptureFile.getAbsolutePath();
+                /* 采用压缩转档方法 */
+				bm.compress(Bitmap.CompressFormat.JPEG, 100, bos);
+
+                /* 调用flush()方法，更新BufferStream */
+				bos.flush();
+
+                /* 结束OutputStream */
+				bos.close();
+
+                /* 让相片显示3秒后圳重设相机 */
+				// Thread.sleep(2000);
+                /* 重新设定Camera */
+				if(!TextUtils.isEmpty(strCaptureFileFullName)) {
+					new CaptureTask().execute(strCaptureFileFullName, requestURL);
+				}
+				if (mCamera != null && previewing)
+				{
+					mCamera.stopPreview();
+					mCamera.release();
+					mCamera = null;
+					previewing = false;
+				}
+
+				//initCamera();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	};
+	/* 自定义class AutoFocusCallback */
+	public final class AutoFocusCallback implements
+			android.hardware.Camera.AutoFocusCallback {
+		public void onAutoFocus(boolean focused, Camera camera) {
+
+            /* 对到焦点拍照 */
+			if (focused) {
+				takePicture();
+			}
+		}
+	};
+
+	private String getCurrentTimeString(){
+		SimpleDateFormat formatter    =   new    SimpleDateFormat    ("yyyyMMdd_HHmmss");
+		Date curDate    =   new    Date(System.currentTimeMillis());//获取当前时间
+		String    str    =    formatter.format(curDate);
+		return str;
 	}
 }
